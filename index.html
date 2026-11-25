@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BagDump</title>
+<style>
+:root{
+  --bg:#f3f0e8; --panel:#ffffff; --panel2:#faf8f3; --ink:#232622; --muted:#7b7b72; --line:#ddd6c6;
+  --accent:#2f6f4f; --accent-ink:#fff; --bagbg:#ebe5d5; --over:#cde8d8; --danger:#b3412f; --bar:#d9d3c3;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#1b1c1a; --panel:#2a2c28; --panel2:#242621; --ink:#e8e6df; --muted:#9a9a8f; --line:#3d3f39;
+  --accent:#5fb083; --accent-ink:#0f140f; --bagbg:#22241f; --over:#2f4a3a; --danger:#e0705c; --bar:#3d3f39;}
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+button,input,select{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer;padding:2px 6px;border-radius:5px}
+button:hover{background:var(--line)}
+.app{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+aside{background:var(--panel);border-right:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:10px}
+aside h1{font-size:18px;margin:0 0 4px}
+aside ul{list-style:none;margin:0;padding:0 0 0 14px}
+aside > ul{padding-left:0}
+.row{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:6px;cursor:pointer}
+.row:hover{background:var(--panel2)}
+.row.current{background:var(--accent);color:var(--accent-ink)}
+.row .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row small{opacity:.7}
+.over{outline:2px dashed var(--accent);outline-offset:-2px;background:var(--over)!important}
+.side-foot{margin-top:auto;display:flex;gap:6px;flex-wrap:wrap}
+.side-foot button{border:1px solid var(--line);font-size:13px}
+main{padding:20px;min-width:0}
+.crumbs{font-size:13px;color:var(--muted);margin-bottom:4px}
+.crumbs button{color:var(--muted);padding:0 2px;text-decoration:underline}
+.title{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.title h2{margin:0;font-size:24px}
+.stat{color:var(--muted);font-size:14px}
+.hint{color:var(--muted);font-size:13px;margin:0 0 14px}
+.board{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;padding:2px}
+.board.root{min-height:200px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.card > header{display:flex;align-items:center;gap:6px;padding:8px 8px 8px 6px;background:var(--panel2);cursor:grab}
+.card > header h3{margin:0;font-size:15px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.count{font-size:12px;color:var(--muted)}
+.bar{height:3px;background:var(--bar)}
+.bar i{display:block;height:100%;background:var(--accent)}
+.bagcard{grid-column:1/-1;background:var(--bagbg);border-style:dashed;border-width:2px}
+.bagcard > header{background:transparent}
+.bagcard > .board{padding:10px 12px 14px}
+.items{list-style:none;margin:0;padding:4px 0}
+.item{display:flex;align-items:center;gap:6px;padding:4px 8px}
+.item:hover{background:var(--panel2)}
+.item .nm{flex:1;min-width:0;overflow-wrap:anywhere;cursor:text}
+.item.done .nm{text-decoration:line-through;color:var(--muted)}
+.item input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;margin:0}
+.qty{display:flex;align-items:center;gap:2px;font-size:13px}
+.qty button{padding:0 5px;color:var(--muted)}
+.qty b{min-width:14px;text-align:center;font-weight:600}
+.acts{display:inline-flex;opacity:0;transition:opacity .1s}
+.card > header:hover .acts,.item:hover .acts,.acts:focus-within{opacity:1}
+@media (hover:none){.acts{opacity:1}}
+.acts button{color:var(--muted);padding:1px 5px}
+.acts button:hover{color:var(--ink)}
+.acts .del:hover{color:var(--danger)}
+.tog{color:var(--muted)}
+form.add{padding:6px 8px 8px}
+form.add input{width:100%;padding:6px 8px;border:1px dashed var(--line);border-radius:6px;background:transparent}
+form.add input:focus{outline:2px solid var(--accent);border-style:solid}
+.tile{border:2px dashed var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;background:transparent}
+.tile form.add{padding:0}
+.tile .lbl{font-size:12px;color:var(--muted)}
+.empty{color:var(--muted);padding:30px 0}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);padding:18px;min-width:min(380px,92vw)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog h2{margin:0 0 12px;font-size:17px}
+dialog label{display:block;margin:8px 0}
+dialog input[type=text],dialog select{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel2)}
+dialog .radios label{display:flex;gap:8px;align-items:baseline;margin:4px 0}
+dialog small{color:var(--muted)}
+.btns{display:flex;flex-direction:row-reverse;gap:8px;margin-top:14px}
+.btns button{border:1px solid var(--line);padding:6px 14px}
+.btns .primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+@media (max-width:760px){
+  .app{grid-template-columns:1fr}
+  aside{border-right:0;border-bottom:1px solid var(--line)}
+  main{padding:14px 16px}
+  .board{grid-template-columns:minmax(0,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside id="side"></aside>
+  <main id="main"></main>
+</div>
+<dialog id="dlg"></dialog>
+<input type="file" id="file" accept="application/json" hidden>
+
+<script>
+'use strict';
+/* ---------- Data model ----------
+   S.bags = [Bag]
+   Bag  { id, name, categories:[Cat], bags:[Bag], collapsed }
+   Cat  { id, name, items:[Item], collapsed }
+   Item { id, name, qty, packed }
+   Nested values (not references) => copying a node is a deep clone, so copies never share state. */
+const KEY = 'bagdump.v1';
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const mkItem = (name, qty = 1, packed = false) => ({ id: uid(), name, qty, packed });
+const mkCat  = (name, items = []) => ({ id: uid(), name, items });
+const mkBag  = (name, categories = [], bags = []) => ({ id: uid(), name, categories, bags });
+
+function sample() {
+  const first = mkCat('First aid', [mkItem('Bandages', 5), mkItem('Gauze pad', 2), mkItem('Medical tape')]);
+  const pouch = mkBag('Drawstring pouch', [first]);
+  return { bags: [mkBag('Daily Backpack', [
+    mkCat('Tools', [mkItem('Multitool'), mkItem('Flashlight'), mkItem('Pen', 2)]),
+    mkCat('Fire kit', [mkItem('Lighter', 2), mkItem('Ferro rod'), mkItem('Tinder tabs', 4)]),
+    mkCat('Clothing', [mkItem('Beanie'), mkItem('Gloves')]),
+  ], [pouch])] };
+}
+
+function normalize(s) {
+  const bag = b => { b.id ||= uid(); b.name ||= 'Bag'; b.categories = (b.categories || []).map(cat); b.bags = (b.bags || []).map(bag); return b; };
+  const cat = c => { c.id ||= uid(); c.name ||= 'Category'; c.items = (c.items || []).map(item); return c; };
+  const item = i => { i.id ||= uid(); i.name ||= 'Item'; i.qty = Math.max(1, +i.qty || 1); i.packed = !!i.packed; return i; };
+  s.bags = (s.bags || []).map(bag);
+  return s;
+}
+function load() {
+  try { const raw = localStorage.getItem(KEY); if (raw) return normalize(JSON.parse(raw)); } catch (e) {}
+  return sample();
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+let S = load();
+let current = S.bags[0]?.id ?? null;
+let idx = new Map();   // id -> {node, kind:'bag'|'cat'|'item', parent: node|null, list: array holding node}
+
+function reindex() {
+  idx = new Map();
+  const walk = (b, parent) => {
+    idx.set(b.id, { node: b, kind: 'bag', parent, list: parent ? parent.bags : S.bags });
+    b.categories.forEach(c => {
+      idx.set(c.id, { node: c, kind: 'cat', parent: b, list: b.categories });
+      c.items.forEach(i => idx.set(i.id, { node: i, kind: 'item', parent: c, list: c.items }));
+    });
+    b.bags.forEach(x => walk(x, b));
+  };
+  S.bags.forEach(b => walk(b, null));
+}
+
+/* ---------- Operations ---------- */
+function cloneNode(n, kind) {
+  const c = JSON.parse(JSON.stringify(n));
+  const fresh = (x, k) => {
+    x.id = uid();
+    if (k === 'bag') { x.categories.forEach(y => fresh(y, 'cat')); x.bags.forEach(y => fresh(y, 'bag')); }
+    else if (k === 'cat') x.items.forEach(y => fresh(y, 'item'));
+  };
+  fresh(c, kind);
+  return c;
+}
+function listFor(kind, parentId) {
+  if (kind === 'bag') return parentId ? idx.get(parentId).node.bags : S.bags;
+  if (kind === 'cat') return idx.get(parentId).node.categories;
+  return idx.get(parentId).node.items;
+}
+function place(kind, node, parentId, beforeId = null) {
+  const list = listFor(kind, parentId);
+  const pos = beforeId ? list.findIndex(x => x.id === beforeId) : -1;
+  if (pos < 0) list.push(node); else list.splice(pos, 0, node);
+}
+function inside(id, ancestorId) {            // is `id` the same as, or nested within, `ancestorId`?
+  let e = idx.get(id);
+  while (e) { if (e.node.id === ancestorId) return true; e = e.parent ? idx.get(e.parent.id) : null; }
+  return false;
+}
+function move(id, parentId, beforeId = null) {
+  const e = idx.get(id);
+  if (e.kind === 'bag' && parentId && inside(parentId, id)) return;
+  if (beforeId === id) return;
+  e.list.splice(e.list.indexOf(e.node), 1);
+  place(e.kind, e.node, parentId, beforeId);
+}
+function copy(id, parentId, beforeId = null) {
+  const e = idx.get(id);
+  place(e.kind, cloneNode(e.node, e.kind), parentId, beforeId);
+}
+function duplicate(id) {
+  const e = idx.get(id);
+  const c = cloneNode(e.node, e.kind);
+  if (e.kind !== 'item') c.name += ' (copy)';
+  e.list.splice(e.list.indexOf(e.node) + 1, 0, c);
+}
+function remove(id) {
+  const e = idx.get(id);
+  e.list.splice(e.list.indexOf(e.node), 1);
+}
+function stats(b) {
+  let t = 0, p = 0;
+  b.categories.forEach(c => c.items.forEach(i => { t++; if (i.packed) p++; }));
+  b.bags.forEach(x => { const s = stats(x); t += s.t; p += s.p; });
+  return { t, p };
+}
+const catStats = c => ({ t: c.items.length, p: c.items.filter(i => i.packed).length });
+function path(id) {
+  const out = []; let e = idx.get(id);
+  while (e) { out.unshift(e.node.name); e = e.parent ? idx.get(e.parent.id) : null; }
+  return out.join(' › ');
+}
+
+/* ---------- Rendering ---------- */
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pct = ({ t, p }) => t ? Math.round(p / t * 100) : 0;
+
+function acts(kind, id, opts = {}) {
+  const b = (act, label, text, cls = '') => `<button class="${cls}" data-act="${act}" data-id="${id}" title="${label}" aria-label="${label}">${text}</button>`;
+  return `<span class="acts">${opts.open ? b('open', 'Open this bag', '↗') : ''}${b('rename', 'Rename', '✎')}${b('dup', 'Duplicate', '⧉')}${b('xfer', 'Copy or move to…', '⇢')}${b('del', 'Delete', '✕', 'del')}</span>`;
+}
+function itemHTML(i) {
+  return `<li class="item ${i.packed ? 'done' : ''}" draggable="true" data-kind="item" data-id="${i.id}">
+    <input type="checkbox" data-act="pack" data-id="${i.id}" ${i.packed ? 'checked' : ''} aria-label="Packed">
+    <span class="nm" data-act="rename" data-id="${i.id}">${esc(i.name)}</span>
+    <span class="qty"><button data-act="dec" data-id="${i.id}" aria-label="Less">−</button><b>${i.qty}</b><button data-act="inc" data-id="${i.id}" aria-label="More">+</button></span>
+    ${acts('item', i.id)}
+  </li>`;
+}
+function catHTML(c, force = false) {
+  const closed = c.collapsed && !force;
+  const s = catStats(c);
+  return `<section class="card cat" data-kind="cat" data-id="${c.id}">
+    <header draggable="true">${force ? '' : `<button class="tog" data-act="toggle" data-id="${c.id}" aria-label="Collapse">${closed ? '▸' : '▾'}</button>`}
+      <h3>${esc(c.name)}</h3><span class="count">${s.p}/${s.t}</span>${acts('cat', c.id)}</header>
+    <div class="bar"><i style="width:${pct(s)}%"></i></div>
+    ${closed ? '' : `<ul class="items">${c.items.map(itemHTML).join('')}</ul>
+    <form class="add" data-act="additem" data-id="${c.id}"><input type="text" list="itemnames" placeholder="+ Add item" aria-label="Add item to ${esc(c.name)}"></form>`}
+  </section>`;
+}
+function tileHTML(b) {
+  return `<div class="tile">
+    <div class="lbl">Add to ${esc(b.name)}</div>
+    <form class="add" data-act="addcat" data-id="${b.id}"><input type="text" placeholder="+ New category" aria-label="New category"></form>
+    <form class="add" data-act="addbag" data-id="${b.id}"><input type="text" placeholder="+ New bag inside" aria-label="New bag inside"></form>
+  </div>`;
+}
+function boardInner(b, root = false) {
+  return b.categories.map(c => catHTML(c, root)).join('') + b.bags.map(bagCardHTML).join('') + tileHTML(b);
+}
+function bagCardHTML(b) {
+  const s = stats(b);
+  return `<section class="card bagcard" data-kind="bag" data-id="${b.id}">
+    <header draggable="true"><button class="tog" data-act="toggle" data-id="${b.id}" aria-label="Collapse">${b.collapsed ? '▸' : '▾'}</button>
+      <h3>🎒 ${esc(b.name)}</h3><span class="count">${s.p}/${s.t} packed</span>${acts('bag', b.id, { open: true })}</header>
+    <div class="bar"><i style="width:${pct(s)}%"></i></div>
+    ${b.collapsed ? '' : `<div class="board">${boardInner(b)}</div>`}
+  </section>`;
+}
+function treeHTML(bags) {
+  return `<ul>${bags.map(b => {
+    const s = stats(b);
+    return `<li><div class="row ${b.id === current ? 'current' : ''}" data-kind="bag" data-id="${b.id}" data-act="open"><span class="n">🎒 ${esc(b.name)}</span><small>${s.p}/${s.t}</small></div>${b.bags.length ? treeHTML(b.bags) : ''}</li>`;
+  }).join('')}</ul>`;
+}
+
+function render() {
+  reindex();
+  if (!idx.has(current)) current = S.bags[0]?.id ?? null;
+  const y = window.scrollY;
+
+  document.getElementById('side').innerHTML = `
+    <h1>BagDump</h1>
+    ${treeHTML(S.bags)}
+    <form class="add" data-act="newtop" style="padding:0"><input type="text" placeholder="+ New bag" aria-label="New bag"></form>
+    <div class="side-foot"><button data-act="export">Export</button><button data-act="import">Import</button></div>`;
+
+  const main = document.getElementById('main');
+  if (!current) { main.innerHTML = '<p class="empty">No bags yet. Add one in the sidebar.</p>'; return; }
+  const b = idx.get(current).node, s = stats(b);
+  const crumbs = []; for (let e = idx.get(current).parent; e; e = e.parent ? idx.get(e.parent.id) : null) crumbs.unshift(e.node);
+  const names = [...new Set([...idx.values()].filter(e => e.kind === 'item').map(e => e.node.name))].sort();
+  main.innerHTML = `
+    ${crumbs.length ? `<div class="crumbs">${crumbs.map(c => `<button data-act="open" data-id="${c.id}">${esc(c.name)}</button> ›`).join(' ')}</div>` : ''}
+    <div class="title"><h2>🎒 ${esc(b.name)}</h2><span class="stat">${s.p}/${s.t} packed</span>${acts('bag', b.id)}</div>
+    <p class="hint">Drag items, categories and bags to move them. Hold <b>Alt</b> while dropping to copy instead. Use ⇢ to copy or move into any bag (works on touch screens too).</p>
+    <div class="board root" data-kind="bag" data-id="${b.id}">${boardInner(b, true)}</div>
+    <datalist id="itemnames">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist>`;
+  window.scrollTo(0, y);
+}
+function commit() { save(); render(); }
+
+/* ---------- Dialogs ---------- */
+const dlg = document.getElementById('dlg');
+function openDlg(html, collect) {
+  return new Promise(res => {
+    dlg.innerHTML = html;
+    dlg.returnValue = '';
+    dlg.onclose = () => res(dlg.returnValue === 'ok' ? collect(dlg) : null);
+    dlg.showModal();
+    const f = dlg.querySelector('[autofocus]'); if (f) { f.focus(); if (f.select) f.select(); }
+  });
+}
+const askText = (title, value) => openDlg(
+  `<form method="dialog"><h2>${esc(title)}</h2><input type="text" name="v" value="${esc(value)}" autofocus>
+   <div class="btns"><button value="ok" class="primary">OK</button><button value="cancel" formnovalidate>Cancel</button></div></form>`,
+  d => d.querySelector('input').value.trim());
+
+async function transfer(id) {
+  const e = idx.get(id), opts = [];
+  if (e.kind === 'item') idx.forEach((x, k) => { if (x.kind === 'cat') opts.push({ v: k, label: path(k) }); });
+  else {
+    if (e.kind === 'bag') opts.push({ v: '', label: '(Top level)' });
+    idx.forEach((x, k) => { if (x.kind === 'bag' && !(e.kind === 'bag' && inside(k, id))) opts.push({ v: k, label: path(k) }); });
+  }
+  if (!opts.length) { alert('Nowhere to put it yet.'); return; }
+  const what = { bag: 'bag', cat: 'category', item: 'item' }[e.kind];
+  const r = await openDlg(
+    `<form method="dialog"><h2>Copy or move ${what} “${esc(e.node.name)}”</h2>
+     <label>Destination ${e.kind === 'item' ? '(category)' : '(bag)'}<select name="t" autofocus>${opts.map(o => `<option value="${o.v}">${esc(o.label)}</option>`).join('')}</select></label>
+     <div class="radios">
+       <label><input type="radio" name="m" value="copy" checked> <span>Copy <small>original stays; the copy is independent</small></span></label>
+       <label><input type="radio" name="m" value="move"> <span>Move</span></label>
+     </div>
+     <div class="btns"><button value="ok" class="primary">OK</button><button value="cancel" formnovalidate>Cancel</button></div></form>`,
+    d => ({ t: d.querySelector('select').value, m: d.querySelector('input[name=m]:checked').value }));
+  if (!r) return;
+  const parent = r.t || null;
+  if (r.m === 'copy') copy(id, parent); else move(id, parent);
+  if (e.kind === 'bag' && r.m === 'move' && !parent) { /* stays reachable in sidebar */ }
+  commit();
+}
+
+/* ---------- Events ---------- */
+document.addEventListener('click', async ev => {
+  const el = ev.target.closest('[data-act]');
+  if (!el || el.tagName === 'FORM' || el.tagName === 'INPUT' && el.type === 'text') return;
+  const act = el.dataset.act, id = el.dataset.id;
+  const e = id && idx.get(id);
+  switch (act) {
+    case 'open': current = id; render(); window.scrollTo(0, 0); break;
+    case 'toggle': e.node.collapsed = !e.node.collapsed; commit(); break;
+    case 'pack': e.node.packed = el.checked; commit(); break;
+    case 'inc': e.node.qty++; commit(); break;
+    case 'dec': e.node.qty = Math.max(1, e.node.qty - 1); commit(); break;
+    case 'rename': { const t = await askText('Rename', e.node.name); if (t) { e.node.name = t; commit(); } break; }
+    case 'dup': duplicate(id); commit(); break;
+    case 'xfer': await transfer(id); break;
+    case 'del': {
+      const full = e.kind === 'bag' ? (e.node.categories.length || e.node.bags.length) : e.kind === 'cat' ? e.node.items.length : 0;
+      if (full && !confirm(`Delete “${e.node.name}” and everything inside it?`)) break;
+      remove(id); commit(); break;
+    }
+    case 'export': {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }));
+      a.download = 'bagdump-' + new Date().toISOString().slice(0, 10) + '.json'; a.click(); URL.revokeObjectURL(a.href); break;
+    }
+    case 'import': document.getElementById('file').click(); break;
+  }
+});
+document.getElementById('file').addEventListener('change', async ev => {
+  const f = ev.target.files[0]; ev.target.value = '';
+  if (!f) return;
+  try {
+    const data = normalize(JSON.parse(await f.text()));
+    if (!confirm('Replace everything with the imported file?')) return;
+    S = data; current = S.bags[0]?.id ?? null; commit();
+  } catch (e) { alert('Could not read that file.'); }
+});
+document.addEventListener('submit', ev => {
+  const f = ev.target.closest('form[data-act]');
+  if (!f) return;
+  ev.preventDefault();
+  const v = f.querySelector('input').value.trim();
+  if (!v) return;
+  const act = f.dataset.act, id = f.dataset.id;
+  if (act === 'additem') place('item', mkItem(v), id);
+  else if (act === 'addcat') place('cat', mkCat(v), id);
+  else if (act === 'addbag') place('bag', mkBag(v), id);
+  else if (act === 'newtop') { const b = mkBag(v); S.bags.push(b); current = b.id; }
+  commit();
+  document.querySelector(`form[data-act="${act}"]${id ? `[data-id="${id}"]` : ''} input`)?.focus();
+});
+
+/* ---------- Drag & drop ---------- */
+let drag = null, marked = null;
+const up = (ev, k) => ev.target.closest?.(`[data-kind="${k}"]`);
+function dropTarget(ev) {
+  if (!drag) return null;
+  if (drag.kind === 'item') {
+    const it = up(ev, 'item');
+    if (it) { if (it.dataset.id === drag.id) return null; return { el: it, parentId: idx.get(it.dataset.id).parent.id, beforeId: it.dataset.id }; }
+    const c = up(ev, 'cat');
+    return c ? { el: c, parentId: c.dataset.id, beforeId: null } : null;
+  }
+  if (drag.kind === 'cat') {
+    const c = up(ev, 'cat');
+    if (c) { if (c.dataset.id === drag.id) return null; return { el: c, parentId: idx.get(c.dataset.id).parent.id, beforeId: c.dataset.id }; }
+    const b = up(ev, 'bag');
+    return b ? { el: b, parentId: b.dataset.id, beforeId: null } : null;
+  }
+  const b = up(ev, 'bag');
+  return b && !inside(b.dataset.id, drag.id) ? { el: b, parentId: b.dataset.id, beforeId: null } : null;
+}
+function mark(el) { if (marked === el) return; unmark(); marked = el; el?.classList.add('over'); }
+function unmark() { marked?.classList.remove('over'); marked = null; }
+document.addEventListener('dragstart', ev => {
+  const el = ev.target.closest?.('[data-kind]');
+  if (!el) return;
+  drag = { kind: el.dataset.kind, id: el.dataset.id };
+  ev.dataTransfer.effectAllowed = 'copyMove';
+  ev.dataTransfer.setData('text/plain', drag.id);
+  if (drag.kind !== 'item') ev.dataTransfer.setDragImage(el, 20, 20);
+});
+document.addEventListener('dragover', ev => {
+  const t = dropTarget(ev);
+  if (t) { ev.preventDefault(); ev.dataTransfer.dropEffect = ev.altKey ? 'copy' : 'move'; mark(t.el); } else unmark();
+});
+document.addEventListener('drop', ev => {
+  const t = dropTarget(ev);
+  unmark();
+  if (!t) return;
+  ev.preventDefault();
+  if (ev.altKey) copy(drag.id, t.parentId, t.beforeId); else move(drag.id, t.parentId, t.beforeId);
+  drag = null; commit();
+});
+document.addEventListener('dragend', () => { unmark(); drag = null; });
+
+render();
+</script>
+</body>
+</html>
